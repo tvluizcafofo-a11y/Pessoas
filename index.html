@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<title>Quem é? — memória de nomes</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#181b22; --line:#272b35; --txt:#e8eaf0;
+    --dim:#98a1b0; --acc:#4f8cff; --ok:#2fbf71; --warn:#ffb020; --bad:#ff5c5c;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg);color:var(--txt);
+    font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex;flex-direction:column;height:100dvh;overflow:hidden;
+  }
+  header{display:flex;align-items:center;gap:10px;padding:10px 14px;
+    border-bottom:1px solid var(--line);flex:none}
+  header .logo{font-size:22px}
+  header h1{font-size:16px;margin:0;font-weight:600}
+  #status{font-size:11px;color:var(--dim)}
+  main{flex:1;overflow-y:auto;padding:12px;display:block}
+  .page{display:none;flex-direction:column;gap:10px}
+  .page.active{display:flex}
+
+  .videowrap{position:relative;width:100%;aspect-ratio:3/4;background:#000;
+    border-radius:14px;overflow:hidden;border:1px solid var(--line);
+    touch-action:manipulation}
+  .videowrap video,.videowrap canvas,.videowrap img{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+  .videowrap canvas{pointer-events:none}
+  .videowrap img{display:none}
+  .videowrap.has-photo video,.videowrap.has-photo canvas{display:none}
+  .videowrap.has-photo img{display:block}
+
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .row>*{flex:1;min-width:120px}
+
+  .btn{display:flex;align-items:center;justify-content:center;gap:6px;
+    background:var(--card);border:1px solid var(--line);color:var(--txt);
+    padding:12px 14px;border-radius:11px;font:inherit;font-size:14px;
+    cursor:pointer;text-align:center;user-select:none}
+  .btn:active{transform:scale(.98)}
+  .btn.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+  .btn.success{background:var(--ok);border-color:var(--ok);color:#04150c;font-weight:700}
+  .btn.big{padding:15px}
+  .btn.ghost{background:transparent}
+  .btn[disabled]{opacity:.45;pointer-events:none}
+
+  label.field{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--dim)}
+  input[type=text],textarea{
+    width:100%;background:var(--card);border:1px solid var(--line);color:var(--txt);
+    padding:12px;border-radius:11px;font:inherit;font-size:15px;outline:none;resize:vertical}
+  input[type=text]:focus,textarea:focus{border-color:var(--acc)}
+
+  .hint{font-size:12.5px;color:var(--dim);min-height:18px}
+  .hint.ok{color:var(--ok)} .hint.warn{color:var(--warn)} .hint.bad{color:var(--bad)}
+
+  /* scan */
+  .matchbox{margin-top:10px;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:12px;display:flex;gap:12px;align-items:center;min-height:86px}
+  .matchbox.hit{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok) inset}
+  .matchbox.maybe{border-color:var(--warn)}
+  .matchbox img{width:62px;height:62px;border-radius:12px;object-fit:cover;flex:none;background:#000}
+  .mb-empty{color:var(--dim);font-size:14px}
+  .mb-name{font-size:20px;font-weight:700;line-height:1.15}
+  .mb-meta{font-size:13px;color:var(--dim);margin-top:2px}
+  .mb-tag{font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;color:var(--ok)}
+  .matchbox.maybe .mb-tag{color:var(--warn)}
+
+  /* lista */
+  .cards{display:flex;flex-direction:column;gap:8px}
+  .card{display:flex;gap:10px;align-items:center;background:var(--card);
+    border:1px solid var(--line);border-radius:14px;padding:10px}
+  .card img{width:56px;height:56px;border-radius:11px;object-fit:cover;flex:none;background:#000}
+  .card .info{flex:1;min-width:0}
+  .card .name{font-weight:650;font-size:15.5px}
+  .card .meta{font-size:12.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .card .warn{font-size:11px;color:var(--warn)}
+  .card .del{background:none;border:0;color:var(--dim);font-size:19px;cursor:pointer;padding:8px}
+  .empty{color:var(--dim);text-align:center;padding:30px 10px;font-size:14px}
+
+  /* histórico */
+  .hist-card{display:flex;gap:10px;align-items:center;background:var(--card);
+    border:1px solid var(--line);border-radius:14px;padding:10px;cursor:pointer}
+  .hist-card:active{background:#1e2229}
+  .hist-card img{width:64px;height:64px;border-radius:11px;object-fit:cover;flex:none;background:#000}
+  .hist-card .info{flex:1;min-width:0}
+  .hist-card .name{font-weight:650;font-size:15px}
+  .hist-card .name.unknown{color:var(--warn);font-weight:600;font-style:italic}
+  .hist-card .meta{font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hist-card .time{font-size:11px;color:var(--dim);margin-top:3px}
+  .hist-card .del{background:none;border:0;color:var(--dim);font-size:19px;cursor:pointer;padding:8px}
+
+  /* captura rápida (FAB) */
+  #fab{
+    position:absolute; right:14px; bottom:60px;
+    width:60px; height:60px; border-radius:50%;
+    background:var(--acc); border:0; color:#fff; font-size:26px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 8px 24px rgba(0,0,0,.5);
+    cursor:pointer; z-index:4; transition:transform .12s, background .2s;
+  }
+  #fab:active{ transform:scale(.92) }
+  #fab.armed{ background:var(--ok) }
+
+  .zoomctl{
+    position:absolute; left:12px; right:12px; bottom:12px;
+    display:flex; align-items:center; gap:10px;
+    background:rgba(15,17,21,.72); backdrop-filter:blur(8px);
+    border:1px solid var(--line); border-radius:20px;
+    padding:7px 14px; z-index:3; font-size:12px; color:var(--dim);
+  }
+  .zoomctl input[type=range]{
+    flex:1; -webkit-appearance:none; appearance:none;
+    height:4px; border-radius:2px; background:var(--line); outline:none;
+  }
+  .zoomctl input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
+    background:var(--acc); cursor:pointer;
+  }
+  .zoomctl input[type=range]::-moz-range-thumb{
+    width:18px; height:18px; border:0; border-radius:50%;
+    background:var(--acc); cursor:pointer;
+  }
+  #zoomVal{ min-width:38px; text-align:right; color:var(--txt); font-weight:600 }
+
+  #btnLow{
+    position:absolute; left:12px; top:12px; z-index:3;
+    background:rgba(15,17,21,.72); backdrop-filter:blur(8px);
+    border:1px solid var(--line); color:var(--dim);
+    padding:8px 12px; border-radius:20px; font:inherit; font-size:12px;
+    display:flex; align-items:center; gap:6px; cursor:pointer;
+  }
+  #btnLow.on{ background:var(--warn); border-color:var(--warn); color:#241a00; font-weight:700 }
+
+  nav{flex:none;display:flex;border-top:1px solid var(--line);background:var(--card);
+    padding-bottom:env(safe-area-inset-bottom)}
+  nav button{flex:1;background:none;border:0;color:var(--dim);padding:9px 4px 11px;
+    font:inherit;font-size:11px;display:flex;flex-direction:column;align-items:center;
+    gap:3px;cursor:pointer}
+  nav button .ico{font-size:20px;line-height:1}
+  nav button.active{color:var(--acc)}
+
+  #overlay{position:fixed;inset:0;background:rgba(10,12,16,.92);display:flex;
+    flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    z-index:50;font-size:14px;color:var(--dim)}
+  #overlay.hidden{display:none}
+  .spin{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--acc);
+    border-radius:50%;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  #toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);
+    background:#fff;color:#111;padding:10px 18px;border-radius:22px;font-size:14px;
+    font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:60}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* lightbox do histórico */
+  #lightbox{position:fixed;inset:0;background:rgba(5,6,9,.94);z-index:70;
+    display:none;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;padding:20px}
+  #lightbox.show{display:flex}
+  #lightbox img{max-width:92vw;max-height:60vh;border-radius:14px;object-fit:contain}
+  #lightbox .lb-name{font-size:22px;font-weight:700;text-align:center}
+  #lightbox .lb-meta{color:var(--dim);font-size:14px;text-align:center;max-width:88vw}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🧠</div>
+  <div>
+    <h1>Quem é?</h1>
+    <div id="status">Iniciando…</div>
+  </div>
+</header>
+
+<main>
+  <!-- ============ ESCANEAR ============ -->
+  <section id="page-scan" class="page active">
+    <div class="videowrap" id="scanWrap">
+      <video id="scanVideo" autoplay muted playsinline></video>
+      <canvas id="scanCanvas"></canvas>
+
+      <button id="btnLow" title="Modo baixa luz">🌙 Baixa luz</button>
+      <button id="fab" title="Captura rápida">📸</button>
+
+      <div class="zoomctl">
+        <span>🔍</span>
+        <input id="zoom" type="range" min="1" max="4" step="0.1" value="1">
+        <span id="zoomVal">1.0×</span>
+      </div>
+    </div>
+
+    <div id="matchBox" class="matchbox">
+      <div class="mb-empty">Aponte a câmera para um rosto…</div>
+    </div>
+  </section>
+
+  <!-- ============ ADICIONAR ============ -->
+  <section id="page-add" class="page">
+    <div class="videowrap" id="addWrap">
+      <video id="addVideo" autoplay muted playsinline></video>
+      <img id="preview" alt="Prévia">
+    </div>
+
+    <div class="row">
+      <button id="btnShot" class="btn primary">📸 Tirar foto</button>
+      <label class="btn">🖼️ Galeria
+        <input type="file" id="fileIn" accept="image/*" hidden>
+      </label>
+      <button id="btnRetake" class="btn ghost" hidden>↺ Refazer</button>
+    </div>
+
+    <div id="faceStatus" class="hint"></div>
+
+    <label class="field">Nome *
+      <input id="inName" type="text" placeholder="Ex: Maria Silva" autocomplete="off">
+    </label>
+    <label class="field">Onde conheci
+      <input id="inPlace" type="text" placeholder="Ex: Trabalho / Curso de inglês" autocomplete="off">
+    </label>
+    <label class="field">Observações
+      <textarea id="inNotes" rows="2" placeholder="Ex: tem um cachorro chamado Bob"></textarea>
+    </label>
+
+    <button id="btnSave" class="btn success big">Salvar pessoa</button>
+  </section>
+
+  <!-- ============ LISTA ============ -->
+  <section id="page-list" class="page">
+    <input id="search" type="text" placeholder="🔍 Buscar por nome, lugar ou observação…">
+    <div id="peopleList" class="cards"></div>
+    <div class="row" style="margin-top:6px">
+      <button id="btnExport" class="btn">⬇️ Backup</button>
+      <label class="btn">⬆️ Restaurar
+        <input type="file" id="importIn" accept="application/json,.json" hidden>
+      </label>
+    </div>
+  </section>
+
+  <!-- ============ HISTÓRICO ============ -->
+  <section id="page-history" class="page">
+    <div class="row" style="align-items:center">
+      <div style="font-size:13px;color:var(--dim);flex:2">
+        Últimas capturas rápidas (máx. 50). Toque para ampliar.
+      </div>
+      <button id="btnHistClear" class="btn" style="flex:1;min-width:auto;padding:9px">🧹 Limpar</button>
+    </div>
+    <div id="histList" class="cards"></div>
+  </section>
+</main>
+
+<nav>
+  <button data-tab="scan" class="active"><span class="ico">🎯</span>Escanear</button>
+  <button data-tab="add"><span class="ico">➕</span>Adicionar</button>
+  <button data-tab="list"><span class="ico">👥</span>Pessoas <span id="count"></span></button>
+  <button data-tab="history"><span class="ico">📸</span>Histórico <span id="histCount"></span></button>
+</nav>
+
+<div id="overlay"><div class="spin"></div><div id="ovText">Baixando modelos de IA…</div></div>
+<div id="toast"></div>
+<div id="lightbox">
+  <img id="lbImg" alt="">
+  <div class="lb-name" id="lbName"></div>
+  <div class="lb-meta" id="lbMeta"></div>
+  <button class="btn" id="lbClose" style="max-width:200px">Fechar</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script>
+/* ============================================================
+   Utils
+============================================================ */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => (s || '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove('show'), 1900);
+}
+function setStatus(txt){ $('#status').textContent = txt; }
+
+function fmtTime(ts){
+  const d = new Date(ts);
+  const diff = (Date.now() - ts) / 1000;
+  if (diff < 60) return 'agora há pouco';
+  if (diff < 3600) return 'há ' + Math.floor(diff/60) + ' min';
+  if (diff < 86400) return 'há ' + Math.floor(diff/3600) + ' h';
+  return d.toLocaleDateString('pt-BR') + ' ' +
+         d.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+}
+
+/* ============================================================
+   IndexedDB (v2: people + history)
+============================================================ */
+const DB_NAME = 'quem-e-db', STORE = 'people', HIST = 'history';
+let db = null;
+
+function openDB(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, 2);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      if (!d.objectStoreNames.contains(STORE))
+        d.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+      if (!d.objectStoreNames.contains(HIST))
+        d.createObjectStore(HIST, { keyPath: 'id' });
+    };
+    r.onsuccess = () => { db = r.result; res(db); };
+    r.onerror   = () => rej(r.error);
+  });
+}
+const store = (name, mode = 'readonly') => db.transaction(name, mode).objectStore(name);
+
+const dbAll = () => new Promise((res, rej) => {
+  const r = store(STORE).getAll();
+  r.onsuccess = () => res(r.result || []);
+  r.onerror   = () => rej(r.error);
+});
+const dbPut = obj => new Promise((res, rej) => {
+  const r = store(STORE, 'readwrite').put(obj);
+  r.onsuccess = () => res(r.result);
+  r.onerror   = () => rej(r.error);
+});
+const dbDel = id => new Promise((res, rej) => {
+  const r = store(STORE, 'readwrite').delete(id);
+  r.onsuccess = () => res();
+  r.onerror   = () => rej(r.error);
+});
+const dbClear = () => new Promise((res, rej) => {
+  const r = store(STORE, 'readwrite').clear();
+  r.onsuccess = () => res();
+  r.onerror   = () => rej(r.error);
+});
+
+const histAll = () => new Promise((res, rej) => {
+  const r = store(HIST).getAll();
+  r.onsuccess = () => res((r.result || []).sort((a,b) => b.id - a.id));
+  r.onerror   = () => rej(r.error);
+});
+const histPut = obj => new Promise((res, rej) => {
+  const r = store(HIST, 'readwrite').put(obj);
+  r.onsuccess = () => res(r.result);
+  r.onerror   = () => rej(r.error);
+});
+const histDel = id => new Promise((res, rej) => {
+  const r = store(HIST, 'readwrite').delete(id);
+  r.onsuccess = () => res();
+  r.onerror   = () => rej(r.error);
+});
+const histClear = () => new Promise((res, rej) => {
+  const r = store(HIST, 'readwrite').clear();
+  r.onsuccess = () => res();
+  r.onerror   = () => rej(r.error);
+});
+
+/* ============================================================
+   Estado
+============================================================ */
+const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
+const MATCH_THRESHOLD = 0.50;
+const MAYBE_THRESHOLD = 0.65;
+const HIST_MAX = 50;
+
+const addVideo = $('#addVideo'), scanVideo = $('#scanVideo');
+const scanCanvas = $('#scanCanvas');
+
+let people = [];
+let history = [];
+let modelsReady = false;
+let camStream = null;
+let currentTab = 'scan';
+
+let scanRunning = false;
+let pendingPhoto = null;
+let pendingDescriptor = null;
+
+let zoomLevel = 1;
+let lowLight = false;
+let holdResult = false;
+let holdTimer = null;
+const _tmpCanvas = document.createElement('canvas');
+
+/* ============================================================
+   Câmera
+============================================================ */
+async function stopCamera(){
+  if (camStream){ camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  [addVideo, scanVideo].forEach(v => { try { v.pause(); v.srcObject = null; } catch(e){} });
+}
+
+async function startCamera(video){
+  await stopCamera();
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 960 } },
+      audio: false
+    });
+    video.srcObject = camStream;
+    await video.play();
+    if (video === scanVideo) applyZoom();
+  } catch (e){
+    setStatus('Câmera indisponível');
+    alert('Não consegui abrir a câmera.\n\n' + e.message +
+          '\n\nDica: a página precisa estar em HTTPS (ou localhost) e você precisa autorizar o acesso.');
+  }
+}
+
+function fitWrap(video, wrap){
+  const apply = () => {
+    if (video.videoWidth)
+      wrap.style.aspectRatio = video.videoWidth + ' / ' + video.videoHeight;
+  };
+  video.addEventListener('loadedmetadata', apply);
+  video.addEventListener('resize', apply);
+}
+fitWrap(addVideo, $('#addWrap'));
+fitWrap(scanVideo, $('#scanWrap'));
+
+/* ============================================================
+   Zoom + baixa luz
+============================================================ */
+function applyZoom(){
+  const t = 'scale(' + zoomLevel + ')';
+  scanVideo.style.transform = t;
+  scanCanvas.style.transform = t;
+  scanVideo.style.transformOrigin  = 'center center';
+  scanCanvas.style.transformOrigin = 'center center';
+  const lbl = $('#zoomVal');
+  if (lbl) lbl.textContent = zoomLevel.toFixed(1) + '×';
+}
+
+function applyLowLight(){
+  scanVideo.style.filter = lowLight
+    ? 'brightness(1.55) contrast(1.35) saturate(1.05)'
+    : '';
+  const btn = $('#btnLow');
+  if (btn) btn.classList.toggle('on', lowLight);
+}
+
+/* Frame enviado ao detector.
+   - lowLight OFF e zoom 1x  -> usa o próprio <video> (barato)
+   - caso contrário          -> gera canvas (opcionalmente recortado e clareado) */
+function getDetectionSource(applyZoomCrop){
+  const vw = scanVideo.videoWidth, vh = scanVideo.videoHeight;
+  if (!vw || !vh) return null;
+
+  const needCanvas = lowLight || (applyZoomCrop && zoomLevel > 1);
+  if (!needCanvas) return scanVideo;
+
+  let sx = 0, sy = 0, sw = vw, sh = vh;
+  if (applyZoomCrop && zoomLevel > 1){
+    sw = Math.round(vw / zoomLevel);
+    sh = Math.round(vh / zoomLevel);
+    sx = Math.round((vw - sw) / 2);
+    sy = Math.round((vh - sh) / 2);
+  }
+
+  _tmpCanvas.width = sw;
+  _tmpCanvas.height = sh;
+  const ctx = _tmpCanvas.getContext('2d');
+  ctx.filter = lowLight ? 'brightness(1.7) contrast(1.4) saturate(1.05)' : 'none';
+  ctx.drawImage(scanVideo, sx, sy, sw, sh, 0, 0, sw, sh);
+  ctx.filter = 'none';
+  return _tmpCanvas;
+}
+
+/* ============================================================
+   Navegação
+============================================================ */
+async function showTab(name){
+  clearHold();
+  scanRunning = false;
+  await stopCamera();
+  currentTab = name;
+
+  $$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
+  $$('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+
+  if (name === 'add'){
+    if (pendingPhoto){
+      $('#addWrap').classList.add('has-photo');
+      $('#btnRetake').hidden = false;
+      $('#btnShot').hidden = true;
+    } else {
+      $('#addWrap').classList.remove('has-photo');
+      $('#btnRetake').hidden = true;
+      $('#btnShot').hidden = false;
+      await startCamera(addVideo);
+    }
+  }
+  if (name === 'scan'){
+    await startCamera(scanVideo);
+    applyLowLight();
+    startScan();
+  }
+  if (name === 'list') renderList();
+  if (name === 'history') renderHistory();
+}
+
+/* ============================================================
+   ADICIONAR
+============================================================ */
+function setFaceStatus(txt, cls){
+  const el = $('#faceStatus');
+  el.textContent = txt || '';
+  el.className = 'hint ' + (cls || '');
+}
+
+function resetForm(){
+  pendingPhoto = null;
+  pendingDescriptor = null;
+  $('#inName').value = '';
+  $('#inPlace').value = '';
+  $('#inNotes').value = '';
+  $('#preview').removeAttribute('src');
+  $('#addWrap').classList.remove('has-photo');
+  setFaceStatus('');
+}
+
+async function processCapture(source){
+  const sw = source.videoWidth || source.naturalWidth || source.width;
+  const sh = source.videoHeight || source.naturalHeight || source.height;
+  if (!sw || !sh) return;
+
+  const MAX = 720;
+  const scale = Math.min(1, MAX / Math.max(sw, sh));
+  const out = document.createElement('canvas');
+  out.width  = Math.round(sw * scale);
+  out.height = Math.round(sh * scale);
+  out.getContext('2d').drawImage(source, 0, 0, out.width, out.height);
+
+  pendingPhoto = out.toDataURL('image/jpeg', 0.82);
+  $('#preview').src = pendingPhoto;
+  $('#addWrap').classList.add('has-photo');
+  $('#btnShot').hidden = true;
+  $('#btnRetake').hidden = false;
+
+  if (!modelsReady){
+    pendingDescriptor = null;
+    setFaceStatus('IA ainda carregando — a foto será salva sem reconhecimento facial.', 'warn');
+    return;
+  }
+
+  setFaceStatus('Analisando rosto…');
+  try {
+    const res = await faceapi
+      .detectSingleFace(out, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.4 }))
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+    if (res){
+      pendingDescriptor = res.descriptor;
+      setFaceStatus('✅ Rosto detectado — reconhecimento ativado.', 'ok');
+    } else {
+      pendingDescriptor = null;
+      setFaceStatus('⚠️ Nenhum rosto nítido encontrado. A foto será salva, mas sem reconhecimento.', 'warn');
+    }
+  } catch (e){
+    pendingDescriptor = null;
+    setFaceStatus('Erro na análise facial. Foto será salva mesmo assim.', 'warn');
+    console.error(e);
+  }
+}
+
+async function captureFromVideo(){
+  if (!addVideo.videoWidth) return;
+  const c = document.createElement('canvas');
+  c.width  = addVideo.videoWidth;
+  c.height = addVideo.videoHeight;
+  c.getContext('2d').drawImage(addVideo, 0, 0);
+  await processCapture(c);
+}
+
+async function savePerson(){
+  const name = $('#inName').value.trim();
+  if (!name)  return alert('Digite o nome da pessoa.');
+  if (!pendingPhoto) return alert('Tire uma foto ou escolha uma da galeria.');
+
+  const rec = {
+    name,
+    place: $('#inPlace').value.trim(),
+    notes: $('#inNotes').value.trim(),
+    photo: pendingPhoto,
+    createdAt: Date.now()
+  };
+  if (pendingDescriptor) rec.descriptor = pendingDescriptor;
+
+  try {
+    await dbPut(rec);
+    people = await dbAll();
+    updateCount();
+    resetForm();
+    toast('✅ ' + name + ' salvo!');
+    await showTab('list');
+  } catch (e){
+    alert('Erro ao salvar: ' + e.message);
+  }
+}
+
+/* ============================================================
+   ESCANEAR
+============================================================ */
+function findBestMatch(descriptor){
+  let best = null, bestDist = Infinity;
+  for (const p of people){
+    if (!p.descriptor) continue;
+    const d = faceapi.euclideanDistance(descriptor, p.descriptor);
+    if (d < bestDist){ bestDist = d; best = p; }
+  }
+  if (!best) return null;
+  if (bestDist < MATCH_THRESHOLD) return { person: best, distance: bestDist, tentative: false };
+  if (bestDist < MAYBE_THRESHOLD) return { person: best, distance: bestDist, tentative: true };
+  return null;
+}
+
+function drawOverlay(res, state){
+  const ctx = scanCanvas.getContext('2d');
+  const vw = scanVideo.videoWidth, vh = scanVideo.videoHeight;
+  if (!vw || !vh) return;
+  if (scanCanvas.width !== vw || scanCanvas.height !== vh){
+    scanCanvas.width = vw; scanCanvas.height = vh;
+  }
+  ctx.clearRect(0, 0, scanCanvas.width, scanCanvas.height);
+  if (!res) return;
+
+  const src = getDetectionSource(true);
+  const srcW = src.videoWidth || src.width;
+  const srcH = src.videoHeight || src.height;
+  const offX = (vw - srcW) / 2;
+  const offY = (vh - srcH) / 2;
+
+  const b = res.detection.box;
+  ctx.lineWidth = Math.max(3, vw / 160);
+  ctx.strokeStyle = state === 'hit'   ? '#2fbf71'
+                  : state === 'maybe' ? '#ffb020'
+                  : '#4f8cff';
+  const x = offX + b.x, y = offY + b.y;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, b.width, b.height, 14);
+  else ctx.rect(x, y, b.width, b.height);
+  ctx.stroke();
+}
+
+function showMatch(state, match, shot){
+  const box = $('#matchBox');
+
+  if (state === 'none'){
+    box.className = 'matchbox';
+    box.innerHTML = '<div class="mb-empty">Aponte a câmera para um rosto…</div>';
+    return;
+  }
+  if (state === 'unknown'){
+    box.className = 'matchbox';
+    box.innerHTML = '<div class="mb-empty">🙈 Rosto não cadastrado.' +
+      (shot ? ' <b>Toque no botão para retomar.</b>'
+            : ' Vá em <b>Adicionar</b> para registrá-lo.') + '</div>';
+    return;
+  }
+
+  const p = match.person;
+  box.className = 'matchbox ' + (match.tentative ? 'maybe' : 'hit');
+  box.innerHTML =
+    '<img src="' + p.photo + '" alt="">' +
+    '<div style="min-width:0">' +
+      (shot ? '<div style="font-size:11px;color:var(--acc);font-weight:700;letter-spacing:.4px;margin-bottom:4px">📸 CAPTURA RÁPIDA</div>' : '') +
+      '<div class="mb-name">' + esc(p.name) + '</div>' +
+      (p.place ? '<div class="mb-meta">📍 ' + esc(p.place) + '</div>' : '') +
+      (p.notes ? '<div class="mb-meta">📝 ' + esc(p.notes) + '</div>' : '') +
+      '<div class="mb-tag">' + (match.tentative ? 'Parece ser…' : 'Reconhecido ✓') + '</div>' +
+    '</div>';
+}
+
+async function startScan(){
+  if (scanRunning) return;
+  scanRunning = true;
+
+  const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
+  let lastState = '', lastId = null;
+
+  while (scanRunning && currentTab === 'scan'){
+    if (holdResult){ await sleep(200); continue; }
+
+    if (!modelsReady || !scanVideo.videoWidth || scanVideo.readyState < 2){
+      await sleep(150);
+      continue;
+    }
+
+    const src = getDetectionSource(true);
+    if (!src){ await sleep(150); continue; }
+
+    let res = null;
+    try {
+      res = await faceapi
+        .detectSingleFace(src, opts)
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+    } catch (e){ /* frame ruim */ }
+
+    let state = 'none', match = null;
+    if (res){
+      match = findBestMatch(res.descriptor);
+      state = match ? (match.tentative ? 'maybe' : 'hit') : 'unknown';
+    }
+
+    drawOverlay(res, state);
+
+    const key = state + '|' + (match ? match.person.id : '');
+    if (key !== lastState){
+      lastState = key;
+      showMatch(state, match, false);
+      if (state === 'hit' && match.person.id !== lastId){
+        lastId = match.person.id;
+        if (navigator.vibrate) navigator.vibrate(60);
+      }
+    }
+
+    await sleep(220);
+  }
+}
+
+/* ---------- captura rápida ---------- */
+function clearHold(){
+  clearTimeout(holdTimer);
+  holdResult = false;
+  const fab = $('#fab');
+  if (fab) fab.classList.remove('armed');
+  const box = $('#matchBox');
+  if (box){
+    box.className = 'matchbox';
+    box.innerHTML = '<div class="mb-empty">Aponte a câmera para um rosto…</div>';
+  }
+}
+
+async function quickShot(){
+  if (holdResult) return clearHold();
+  if (!modelsReady) return toast('IA ainda carregando…');
+  if (!scanVideo.videoWidth) return;
+
+  const src = getDetectionSource(true);
+  if (!src) return;
+
+  holdResult = true;
+  $('#fab').classList.add('armed');
+  if (navigator.vibrate) navigator.vibrate(35);
+
+  const box = $('#matchBox');
+  box.className = 'matchbox';
+  box.innerHTML = '<div class="mb-empty">📸 Analisando captura…</div>';
+
+  // miniatura
+  const srcW = src.videoWidth || src.width;
+  const srcH = src.videoHeight || src.height;
+  const tw = 180, th = Math.max(1, Math.round(180 * srcH / srcW));
+  const thumbCanvas = document.createElement('canvas');
+  thumbCanvas.width = tw;
+  thumbCanvas.height = th;
+  thumbCanvas.getContext('2d').drawImage(src, 0, 0, tw, th);
+  const thumb = thumbCanvas.toDataURL('image/jpeg', 0.72);
+
+  let state = 'none', match = null;
+  try {
+    const res = await faceapi
+      .detectSingleFace(src, new faceapi.TinyFaceDetectorOptions({
+        inputSize: 512,
+        scoreThreshold: lowLight ? 0.30 : 0.35
+      }))
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+    if (res){
+      match = findBestMatch(res.descriptor);
+      state = match ? (match.tentative ? 'maybe' : 'hit') : 'unknown';
+    }
+  } catch (e){ console.error(e); }
+
+  showMatch(state, match, true);
+  if (state === 'hit' && navigator.vibrate) navigator.vibrate([40, 60, 40]);
+
+  try {
+    await saveToHistory({
+      id: Date.now(),
+      photo: thumb,
+      state,
+      name: match ? match.person.name : null,
+      place: match ? match.person.place : null,
+      notes: match ? match.person.notes : null,
+      distance: match ? match.distance : null,
+      tentative: match ? !!match.tentative : false,
+      lowLight,
+      zoom: zoomLevel
+    });
+  } catch (e){ console.error('hist', e); }
+
+  clearTimeout(holdTimer);
+  holdTimer = setTimeout(clearHold, 8000);
+}
+
+/* ============================================================
+   HISTÓRICO
+============================================================ */
+async function saveToHistory(entry){
+  await histPut(entry);
+  history = await histAll();
+  if (history.length > HIST_MAX){
+    for (const old of history.slice(HIST_MAX)) await histDel(old.id);
+    history = history.slice(0, HIST_MAX);
+  }
+  updateHistCount();
+  if (currentTab === 'history') renderHistory();
+}
+
+function updateHistCount(){
+  const el = $('#histCount');
+  if (el) el.textContent = history.length ? '(' + history.length + ')' : '';
+}
+
+function renderHistory(){
+  const el = $('#histList');
+  if (!history.length){
+    el.innerHTML = '<div class="empty">Nenhuma captura ainda.<br>Use o botão 📸 na tela de escaneamento.</div>';
+    return;
+  }
+  el.innerHTML = history.map(h => {
+    const label = h.name
+      ? esc(h.name)
+      : (h.state === 'unknown' ? 'Rosto não cadastrado' : 'Sem rosto detectado');
+    const cls = h.name ? '' : 'unknown';
+    const flags = [];
+    if (h.lowLight) flags.push('🌙');
+    if (h.zoom > 1) flags.push(h.zoom.toFixed(1) + '×');
+    const extra = flags.length ? ' · ' + flags.join(' · ') : '';
+    return (
+      '<div class="hist-card" data-id="' + h.id + '">' +
+        '<img src="' + h.photo + '" alt="">' +
+        '<div class="info">' +
+          '<div class="name ' + cls + '">' + label + '</div>' +
+          (h.place ? '<div class="meta">📍 ' + esc(h.place) + '</div>' : '') +
+          (h.tentative ? '<div class="meta" style="color:var(--warn)">Parece ser…</div>' : '') +
+          '<div class="time">🕐 ' + fmtTime(h.id) + extra + '</div>' +
+        '</div>' +
+        '<button class="del" data-id="' + h.id + '" title="Excluir">🗑</button>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+async function clearHistory(){
+  if (!history.length) return;
+  if (!confirm('Apagar todo o histórico de capturas?')) return;
+  await histClear();
+  history = [];
+  updateHistCount();
+  renderHistory();
+  toast('Histórico apagado');
+}
+
+function openLightbox(id){
+  const h = history.find(x => x.id === id);
+  if (!h) return;
+  $('#lbImg').src = h.photo;
+  $('#lbName').textContent = h.name || (h.state === 'unknown' ? 'Rosto não cadastrado' : 'Sem rosto');
+  const bits = [];
+  if (h.place) bits.push('📍 ' + h.place);
+  if (h.notes) bits.push('📝 ' + h.notes);
+  bits.push('🕐 ' + fmtTime(h.id));
+  if (h.lowLight) bits.push('🌙 baixa luz');
+  if (h.zoom > 1) bits.push(h.zoom.toFixed(1) + '×');
+  $('#lbMeta').textContent = bits.join(' · ');
+  $('#lightbox').classList.add('show');
+}
+function closeLightbox(){ $('#lightbox').classList.remove('show'); }
+
+/* ============================================================
+   LISTA
+============================================================ */
+function updateCount(){
+  $('#count').textContent = people.length ? '(' + people.length + ')' : '';
+}
+
+function renderList(){
+  const q = ($('#search').value || '').toLowerCase().trim();
+  const list = people
+    .filter(p => !q || (p.name + ' ' + (p.place || '') + ' ' + (p.notes || '')).toLowerCase().includes(q))
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+  const el = $('#peopleList');
+
+  if (!list.length){
+    el.innerHTML = '<div class="empty">Ninguém cadastrado ainda.<br>Vá em <b>➕ Adicionar</b> para começar.</div>';
+    return;
+  }
+
+  el.innerHTML = list.map(p =>
+    '<div class="card">' +
+      '<img src="' + p.photo + '" alt="">' +
+      '<div class="info">' +
+        '<div class="name">' + esc(p.name) + '</div>' +
+        (p.place ? '<div class="meta">📍 ' + esc(p.place) + '</div>' : '') +
+        (p.notes ? '<div class="meta">📝 ' + esc(p.notes) + '</div>' : '') +
+        (p.descriptor ? '' : '<div class="warn">⚠ sem reconhecimento facial</div>') +
+      '</div>' +
+      '<button class="del" data-id="' + p.id + '" title="Excluir">🗑</button>' +
+    '</div>'
+  ).join('');
+}
+
+/* ============================================================
+   Backup
+============================================================ */
+function exportBackup(){
+  if (!people.length) return alert('Nada para exportar ainda.');
+  const data = people.map(p => ({
+    ...p,
+    descriptor: p.descriptor ? Array.from(p.descriptor) : null
+  }));
+  const blob = new Blob([JSON.stringify({ v: 1, people: data })], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'quem-e-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+}
+
+async function importBackup(file){
+  try {
+    const obj = JSON.parse(await file.text());
+    const arr = Array.isArray(obj) ? obj : obj.people;
+    if (!Array.isArray(arr)) throw new Error('Formato não reconhecido.');
+
+    if (!confirm('Importar ' + arr.length + ' pessoas?\nIsso vai SUBSTITUIR todos os dados atuais.')) return;
+
+    await dbClear();
+    for (const p of arr){
+      const rec = {
+        name: p.name || 'Sem nome',
+        place: p.place || '',
+        notes: p.notes || '',
+        photo: p.photo,
+        createdAt: p.createdAt || Date.now()
+      };
+      if (p.descriptor) rec.descriptor = new Float32Array(p.descriptor);
+      await dbPut(rec);
+    }
+    people = await dbAll();
+    renderList();
+    updateCount();
+    toast('Backup restaurado');
+  } catch (e){
+    alert('Erro ao restaurar: ' + e.message);
+  }
+}
+
+/* ============================================================
+   Eventos
+============================================================ */
+function bindEvents(){
+  $$('nav button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+  // Adicionar
+  $('#btnShot').addEventListener('click', captureFromVideo);
+  $('#btnSave').addEventListener('click', savePerson);
+  $('#btnRetake').addEventListener('click', async () => {
+    resetForm();
+    await startCamera(addVideo);
+  });
+  $('#fileIn').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const img = new Image();
+    img.onload = () => processCapture(img);
+    img.onerror = () => alert('Não consegui ler essa imagem.');
+    img.src = URL.createObjectURL(file);
+    e.target.value = '';
+  });
+
+  // Lista
+  $('#search').addEventListener('input', renderList);
+  $('#peopleList').addEventListener('click', async e => {
+    const btn = e.target.closest('.del');
+    if (!btn) return;
+    const id = Number(btn.dataset.id);
+    const p = people.find(x => x.id === id);
+    if (!confirm('Excluir "' + (p ? p.name : '') + '"?')) return;
+    await dbDel(id);
+    people = await dbAll();
+    renderList();
+    updateCount();
+    toast('Excluído');
+  });
+  $('#btnExport').addEventListener('click', exportBackup);
+  $('#importIn').addEventListener('change', async e => {
+    if (e.target.files[0]) await importBackup(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  // Escanear: FAB, zoom, baixa luz, duplo-toque
+  $('#fab').addEventListener('click', quickShot);
+  $('#zoom').addEventListener('input', e => {
+    zoomLevel = parseFloat(e.target.value);
+    applyZoom();
+  });
+  $('#btnLow').addEventListener('click', () => {
+    lowLight = !lowLight;
+    applyLowLight();
+    toast(lowLight ? '🌙 Baixa luz ativada' : 'Baixa luz desativada');
+  });
+  $('#scanWrap').addEventListener('dblclick', e => {
+    if (e.target.closest('#fab') || e.target.closest('.zoomctl') || e.target.closest('#btnLow')) return;
+    quickShot();
+  });
+
+  // Histórico
+  $('#histList').addEventListener('click', async e => {
+    const del = e.target.closest('.del');
+    if (del){
+      const id = Number(del.dataset.id);
+      await histDel(id);
+      history = await histAll();
+      updateHistCount();
+      renderHistory();
+      toast('Removido');
+      return;
+    }
+    const card = e.target.closest('.hist-card');
+    if (card) openLightbox(Number(card.dataset.id));
+  });
+  $('#btnHistClear').addEventListener('click', clearHistory);
+  $('#lbClose').addEventListener('click', closeLightbox);
+  $('#lightbox').addEventListener('click', e => {
+    if (e.target.id === 'lightbox') closeLightbox();
+  });
+
+  // Pausa ao ir para o background
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden){ scanRunning = false; stopCamera(); }
+    else if (currentTab === 'scan' && modelsReady){ showTab('scan'); }
+  });
+}
+
+/* ============================================================
+   Inicialização
+============================================================ */
+(async function init(){
+  try {
+    await openDB();
+    people  = await dbAll();
+    history = await histAll();
+  } catch (e){
+    alert('Erro ao abrir o banco de dados local: ' + e.message);
+  }
+
+  bindEvents();
+  updateCount();
+  updateHistCount();
+  renderList();
+  renderHistory();
+
+  try {
+    setStatus('Baixando modelos de IA…');
+    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+    $('#ovText').textContent = 'Carregando detector facial…';
+    await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+    $('#ovText').textContent = 'Carregando reconhecimento…';
+    await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+
+    modelsReady = true;
+    setStatus('Pronto ✓');
+  } catch (e){
+    console.error(e);
+    setStatus('IA não carregou');
+    alert('Não consegui baixar os modelos de IA.\nVocê ainda pode cadastrar pessoas, mas o reconhecimento facial não vai funcionar.\n\n' + e.message);
+  }
+
+  $('#overlay').classList.add('hidden');
+  await showTab('scan');
+})();
+</script>
+</body>
+</html>
